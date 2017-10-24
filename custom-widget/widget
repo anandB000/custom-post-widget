@@ -1,0 +1,216 @@
+<?php
+/**
+ * This class deals widget functionality.
+ *
+ * It have options to show the EDDD meta fields 
+ * and choose download type.
+ *
+ * @access   private
+ * 
+ */	
+class wpb_widget extends WP_Widget { 
+
+	protected $fields_widget;
+	
+	/**
+	 * Define the widget functionality of the plugin.
+	 *
+	 * Set the widget name and it's description.
+	 *
+	 */
+	function __construct() {
+		parent::__construct('wpb_widget', __('Easy digital download Widget', 'edd-download-details' ), array( 'description' => __( 'Easy digital download Widget shows download products', 'edd-download-details' ), ));
+	}
+	public function get_download_fields(){
+		$fields_widget = new Eddd();
+		return $fields_widget->define_admin_widget();
+	}
+	public function widget( $args, $instance ) {
+		
+		$title = apply_filters( 'widget_title', $instance['title'] );
+		$eddd_download_type = apply_filters( 'eddd_download_type', $instance['eddd_download_type'] );
+		$eddd_download_select = apply_filters( 'eddd_download_select', $instance['eddd_download_select'] );
+		$eddd_download_fields = apply_filters( 'eddd_default_field', $instance['eddd_default_field'] );
+		
+		echo $args['before_widget'];
+		$show_meta = $instance['eddd_default_field'];
+		$fields = $this->get_download_fields();
+		foreach( $fields as $field ){
+			$labels[] = $field['label'];
+			$name[] = $field['name'];
+		}
+		$all_labels = array_combine($name,$labels);
+		if( $eddd_download_type == 'specific' ){
+
+			$download_id = $instance['eddd_download_select'];
+			$get_download_detail = get_post($download_id); 
+			?>
+				<div class="eddd_wrapper">
+					<div class="eddd_image">
+						<?php echo get_the_post_thumbnail( $download_id,'thumbnail',array('class'=>'eddd_thum') );?>
+					</div>
+					<div class="eddd_data_fields">
+						<h3><?php esc_html_e( $get_download_detail->post_title, 'edd-download-details' ); ?></h3>
+						<table width="100%">
+							<?php 
+								
+								$values = get_post_meta($download_id,'edd_download_details_fields',true);
+								
+								if($show_meta){
+									foreach( $show_meta as $meta_key ){
+										?>
+											<tr>
+												<td><label><?php esc_html_e( $all_labels[$meta_key], 'edd-download-details' );?></label></td>
+												<td><?php if( $values[$meta_key] ){ esc_html_e( $values[$meta_key], 'edd-download-details' ); }else{ echo '---';} ?></td>
+											</tr>
+										<?php
+									}
+								}
+							?>
+						</table>
+					</div>
+				</div>
+			<?php
+			
+		}elseif( $eddd_download_type == 'current' ){
+			
+			$args = array(
+				'numberposts' => 1,
+				'offset' => 0,
+				'orderby' => 'post_date',
+				'order' => 'DESC',
+				'post_type' => 'download',
+			);
+			$current_download = wp_get_recent_posts($args,OBJECT);
+			?>
+				<div class="eddd_wrapper">
+					<div class="eddd_image">
+						<?php 
+							if( has_post_thumbnail( $current_download[0]->ID ) ){
+								echo get_the_post_thumbnail($current_download[0]->ID,'thumbnail',array('class'=>'eddd_thum'));
+							}
+						?>
+					</div>
+					<div class="eddd_data_fields">
+						<h3><?php esc_html_e( $current_download[0]->post_title, 'edd-download-details' ); ?></h3>
+						<div class="eddd_metafields_wrapper">
+							<table class="" width="100%">
+								<?php 
+									$values = get_post_meta($current_download[0]->ID,'edd_download_details_fields',true);
+									
+									if($show_meta){
+										foreach( $show_meta as $meta_key ){
+											?>
+												<tr>
+													<td><label><?php esc_html_e( $all_labels[$meta_key], 'edd-download-details' );?></label></td>
+													<td><?php if( $values[$meta_key] ){ esc_html_e( $values[$meta_key], 'edd-download-details' ); }else{ echo '---';} ?></td>
+												</tr>
+											<?php
+										}
+									}
+								?>
+							</table>
+						</div>
+					</div>
+
+				</div>
+			<?php
+		}
+		//echo $args['after_widget'];
+		
+	}	
+	public function form( $instance ) { 
+		$show_meta_list = array();
+		$eddd_download_select = '';
+		
+		if ( isset( $instance[ 'title' ] ) ) {
+			$title = $instance[ 'title' ];
+		}
+		else {
+			$title = __( 'EDDD Additional Details', 'edd-download-details' );
+		}
+		if ( isset( $instance[ 'eddd_download_type' ] ) ) {
+			$eddd_download_type = $instance[ 'eddd_download_type' ];
+		}
+		if ( isset( $instance[ 'eddd_download_select' ] ) ) {
+			$eddd_download_select = $instance[ 'eddd_download_select' ];
+		}
+		if ( isset( $instance[ 'eddd_default_field' ] ) ) {
+			$show_meta_list = $instance['eddd_default_field'];
+		}
+	?>
+	<div class="eddd_widget_admin">
+		<h4><?php echo esc_html( 'Title', 'edd-download-details' ); ?></h4>
+		<p>
+			<input class="widefat" id="<?php echo $this->get_field_id( 'title' ); ?>" name="<?php echo esc_attr( $this->get_field_name( 'title' ), 'edd-download-details' ); ?>" type="text" value="<?php echo esc_attr( $title, 'edd-download-details' ); ?>" />
+		</p>
+		
+		<h4><?php echo esc_html( 'Choose Download Type', 'edd-download-details' ); ?></h4>
+		<ul>
+			<li>
+				<input type="radio" class="download_check" onclick="eddd_typeselect(this);" value="<?php echo esc_attr( 'current', 'edd-download-details' ); ?>" <?php if($eddd_download_type == 'current'){ echo 'checked="checked"';} ?> name="<?php echo esc_attr( $this->get_field_name( 'eddd_download_type' ), 'edd-download-details' ); ?>" id="<?php echo $this->get_field_id( 'current' ); ?>">
+				<label for="<?php echo $this->get_field_id( 'current' ); ?>"><?php echo esc_html( 'Current', 'edd-download-details' ); ?></label>
+			</li>
+			<li>
+				<input type="radio" class="download_check" onclick="eddd_typeselect(this);" value="<?php echo esc_attr( 'specific', 'edd-download-details' ); ?>" <?php if($eddd_download_type == 'specific'){ echo 'checked="checked"';} ?> name="<?php echo esc_attr( $this->get_field_name( 'eddd_download_type' ), 'edd-download-details' ); ?>" id="<?php echo $this->get_field_id( 'specific' ); ?>">
+				<label for="<?php echo $this->get_field_id( 'specific' ); ?>"><?php echo esc_html( 'Specific', 'edd-download-details' ); ?></label>
+			</li>
+		</ul>
+		<div id="eddd_download" class="eddd_downloads_wrapper">
+			<h4><?php echo esc_html( 'Downloads', 'edd-download-details' ); ?></h4>
+
+			<?php
+				global $post;
+				$get_downloads = '';
+				$args = array( 
+							'post_type' => 'download', 
+							'numberposts' => -1, 
+							'offset'=> 0, 
+							'orderby'  => 'post_date', 
+							'order'  => 'DESC'
+						);
+				$get_downloads = get_posts( $args );
+			?>			
+			<select class="widefat" name="<?php echo esc_attr( $this->get_field_name( 'eddd_download_select' ), 'edd-download-details') ; ?>" id="<?php echo $this->get_field_id( 'download-'.$post->ID ); ?>" >
+				<?php foreach( $get_downloads as $key => $post ){  setup_postdata($post); ?>
+					<option <?php if($eddd_download_select == $post->ID){ echo 'selected="selected"';} ?>  value="<?php echo esc_attr($post->ID, 'edd-download-details' ); ?>"><?php echo esc_html( get_the_title(), 'edd-download-details' ); ?></option>
+				<?php } wp_reset_postdata();?>
+			</select>
+		</div>
+		<div id="eddd_download_fields" class="eddd_downloads_fields_wrapper">
+			<h4><?php echo esc_html( 'Fields to show', 'edd-download-details' );?></h4>
+			<?php
+				$fields = $this->get_download_fields();
+				foreach( $fields  as $key=>$field ){ ?>
+					<p>
+						<input type="checkbox" name="<?php echo esc_attr( $this->get_field_name( 'eddd_default_field' ), 'edd-download-details' );?>[]" id="<?php echo $this->get_field_id( 'd_download-'.$key ); ?>" value="<?php echo esc_attr( $field['name'], 'edd-download-details' ); ?>" <?php if( in_array($field['name'],$show_meta_list) ){ echo 'checked="checked"';}?> >
+						<label for="<?php echo $this->get_field_id( 'd_download-'.$key ); ?>"><?php echo esc_html( $field['label'], 'edd-download-details' ); ?></label>
+					</p>
+				<?php
+				}
+			?>
+		</div>
+	</div>
+	<?php 
+	}
+	public function update( $new_instance, $old_instance ) {
+		
+		$instance = array();
+		$instance['title'] = ( ! empty( $new_instance['title'] ) ) ? strip_tags( $new_instance['title'] ) : '';
+		$instance['eddd_download_type'] = strip_tags( $new_instance['eddd_download_type'] );		
+		$instance['eddd_download_select'] = $new_instance['eddd_download_select'];
+		$instance['eddd_default_field_arr'] = $new_instance['eddd_default_field'];
+
+		
+		foreach($instance['eddd_default_field_arr'] as $instance_flds){
+			$show_fields[] = sanitize_text_field($instance_flds);
+		}
+		$instance['eddd_default_field'] = $show_fields;
+		
+		return $instance;
+	}
+} 
+function wpb_load_widget() {
+	register_widget( 'wpb_widget' );
+}
+add_action( 'widgets_init', 'wpb_load_widget' );
